@@ -1,11 +1,13 @@
 package Day07_;
+import static org.hamcrest.Matchers.*;
 
 import Utility.LibraryUtil;
+import io.restassured.RestAssured;
 import org.junit.jupiter.api.Test;
 
 import Utility.ConfigurationReader;
 import Utility.DB_Utility;
-import io.restassured.RestAssured;
+import static io.restassured.RestAssured.*;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -16,17 +18,44 @@ public class LibraryApp_API_DB_Test {
 
     @BeforeAll
     public static void setUp(){
-        RestAssured.baseURI = ConfigurationReader.getProperty("baseURL");
-        RestAssured.basePath = "/rest/v1";
-        DB_Utility.createConnection("library1");
-        libraryToken = LibraryUtil.loginAndGetToken(ConfigurationReader.getProperty("library1.librarian_username"),
-        ConfigurationReader.getProperty("library1.librarian_password"));
+
+        String active_environment = ConfigurationReader.getProperty("active_env");
+        libraryToken = LibraryUtil.setUpRestAssuredAndDB_forEnv(active_environment);
     }
 
 
     @Test
     public void test(){
         System.out.println("libraryToken = " + libraryToken);
+
+        DB_Utility.runQuery("SELECT count(*) FROM books");
+        String bookCount = DB_Utility.getColumnDataAtRow(1,1);
+
+        System.out.println("bookCount = " + bookCount);
+
+        DB_Utility.runQuery("SELECT count(*) FROM users");
+        String userCount = DB_Utility.getColumnDataAtRow(1,1);
+
+        System.out.println("userCount = " + userCount);
+
+        DB_Utility.runQuery("SELECT count(*) FROM book_borrow WHERE is_returned=false");
+        String borrowedBookCount = DB_Utility.getColumnDataAtRow(1,1);
+
+        System.out.println("borrowedBookCount = " + borrowedBookCount);
+
+        given()
+                .log().all()
+                .header("x-library-token",libraryToken).
+                when()
+                .get("/dashboard_stats").
+                then()
+                .body("book_count",is(bookCount))
+                .body("users",is(userCount))
+                .body("borrowed_books",is(borrowedBookCount));
+
+
+
+
     }
 
     @AfterAll
